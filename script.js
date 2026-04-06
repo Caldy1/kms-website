@@ -93,6 +93,7 @@ const CHATBOT_CONFIG = {
 let elevenLabsConv = null;
 let voiceActive    = false;
 let customerData   = {};
+let bookingStep    = null; // null | 'name' | 'email'
 
 // ── DOM refs ────────────────────────────────
 const chatbotBtn        = document.getElementById('chatbotBtn');
@@ -116,7 +117,7 @@ function openChatbot() {
   chatbotOverlay.classList.add('active');
   chatbotBtn.setAttribute('aria-expanded', 'true');
   if (chatbotTranscript.children.length === 0) {
-    appendMessage('agent', "Hi there! I'm the KMS AI Assistant. I can tell you about our services or help you book a discovery call. What would you like to know?");
+    appendMessage('agent', "Your business probably runs on repetition. Mine runs on eliminating it. I'm the KMS Assistant — ask me what we do, or say 'book a call' and I'll get you sorted.");
   }
   setTimeout(() => chatbotClose.focus(), 350);
 }
@@ -161,6 +162,96 @@ function removeTyping() {
   if (t) t.remove();
 }
 
+// ── Rule-based text responses ────────────────
+function getBotResponse(text) {
+  const t = text.toLowerCase();
+
+  if (/automat|workflow|data flow|integrat|manual|repetit|zapier|make\.com|n8n/i.test(t)) {
+    return "AI Automation & Data Flows is one of our core services — we connect your apps and eliminate manual data entry entirely. We map, build, and maintain your full automation stack so nothing slips through the cracks. Want to book a quick call to talk through what we could automate for you?";
+  }
+  if (/chatbot|chat bot|chat agent|website bot|customer agent|live chat/i.test(t)) {
+    return "We build 24/7 AI chatbots that sit on your website, qualify leads, answer questions, and book calls while you sleep — fully custom, not a generic widget. Sound useful? I can get a discovery call booked for you.";
+  }
+  if (/phone|voice agent|call agent|inbound call|missed call/i.test(t)) {
+    return "Our AI Phone Agents handle inbound calls around the clock — they take messages, answer common questions, and route calls intelligently. No more missed calls, no more voicemail black holes. Want to find out how this would work for your business?";
+  }
+  if (/web|website|landing page|web app|platform|build.*site|site.*build/i.test(t)) {
+    return "We build custom web apps and websites — conversion-focused and built to work as hard as you do. From landing pages to full-stack platforms, all done-for-you. Want to talk through what you need?";
+  }
+  if (/geo|generative engine|chatgpt.*find|perplexity|gemini|ai search|found.*ai|ai.*found/i.test(t)) {
+    return "GEO — Generative Engine Optimisation — is about being recommended when someone asks ChatGPT, Perplexity or Gemini about your industry. Traditional SEO won't get you there. We structure your content and authority signals so AI recommends your business first. Want to know more?";
+  }
+  if (/custom|bespoke|specific|unique|tailored|internal tool/i.test(t)) {
+    return "Our Custom AI Solutions are fully bespoke — built around how your business actually operates. Internal productivity tools, customer-facing products, things your competitors don't have yet. Want to run your idea past us on a quick call?";
+  }
+  if (/how.*work|process|what.*happen|step|discover.*build|build.*grow/i.test(t)) {
+    return "We work in three steps: Discover — we audit your business and find every bottleneck AI can fix. Build — we design and deploy your custom AI stack, fully done-for-you. Grow — we stay on as your ongoing AI partner. No hand-off, no disappearing act.";
+  }
+  if (/why.*kms|why.*you|different|stand out|better than|compare/i.test(t)) {
+    return "A few things set us apart: everything is fully done-for-you with no learning curve on your end, every solution is custom-built for your specific business, we're AI-native from day one, and we stay involved long after launch. We're a partner, not a project.";
+  }
+  if (/price|pricing|cost|how much|fee|charge|rate|budget/i.test(t)) {
+    return "Pricing depends on the scope — every project is custom so we don't have off-the-shelf rates. The best way to get a clear picture is a free 30-minute discovery call. No obligation, no jargon. Want me to get one booked for you?";
+  }
+  if (/where|location|based|glasgow|scotland|uk|who are you/i.test(t)) {
+    return "KMS is based in Glasgow, Scotland. We work with businesses across the UK and beyond — everything we do is remote-first so location is never a barrier.";
+  }
+  if (/^(hi|hello|hey|hiya|howdy|morning|afternoon|evening|sup)[\s!?.]*$/i.test(t)) {
+    return "Hey! Good to have you here. Ask me anything about what KMS does, or say 'book a call' and I'll get you sorted in a couple of minutes.";
+  }
+  if (/thank|thanks|cheers|appreciate/i.test(t)) {
+    return "No problem at all! If there's anything else you want to know, just ask — or I can get a discovery call booked whenever you're ready.";
+  }
+
+  return "That's a bit outside what I can help with here — but if you've got questions about what KMS does or want to book a free call, I'm all over it.";
+}
+
+// ── Booking flow ─────────────────────────────
+function triggerBooking() {
+  bookingStep = 'name';
+  appendMessage('agent', "I'd love to get you booked in — it'll only take a moment. Can I grab your name first?");
+}
+
+async function handleBookingStep(text) {
+  if (bookingStep === 'name') {
+    customerData.name = text;
+    bookingStep = 'email';
+    setTimeout(() => appendMessage('agent', `Great, ${customerData.name}! And your email address?`), 400);
+    return;
+  }
+  if (bookingStep === 'email') {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) {
+      appendMessage('agent', "That doesn't look quite right — can you double-check your email?");
+      return;
+    }
+    customerData.email = text;
+    bookingStep = null;
+    setTimeout(() => appendMessage('agent', `Perfect — opening the booking calendar for you now, ${customerData.name}. Pick whatever time suits.`), 400);
+    setTimeout(() => {
+      if (typeof Calendly !== 'undefined') {
+        Calendly.initPopupWidget({
+          url: CHATBOT_CONFIG.calendlyLink,
+          prefill: { name: customerData.name, email: customerData.email },
+        });
+      }
+      if (typeof emailjs !== 'undefined') {
+        const params = {
+          customer_name:    customerData.name,
+          customer_email:   customerData.email,
+          customer_phone:   'Not provided',
+          customer_interest:'Not specified',
+          customer_source:  'KMS chatbot',
+          message:          'Booking initiated via chatbot.',
+        };
+        Promise.allSettled([
+          emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateNotify,  params),
+          emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateConfirm, params),
+        ]);
+      }
+    }, 900);
+  }
+}
+
 // ── Text input ───────────────────────────────
 chatbotTextInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
@@ -170,37 +261,30 @@ chatbotTextInput.addEventListener('keydown', (e) => {
 });
 chatbotSendBtn.addEventListener('click', sendTextMessage);
 
-async function sendTextMessage() {
+function sendTextMessage() {
   const text = chatbotTextInput.value.trim();
   if (!text) return;
   chatbotTextInput.value = '';
   appendMessage('user', text);
-  showTyping();
 
-  if (/book|call|calendly|schedule|appointment/i.test(text)) {
-    removeTyping();
+  // Booking flow takes priority
+  if (bookingStep) {
+    handleBookingStep(text);
+    return;
+  }
+
+  // Check for booking intent
+  if (/book|call|speak|schedule|appointment|meeting|discovery|calendar|next step|get in touch|interested/i.test(text)) {
     triggerBooking();
     return;
   }
 
-  try {
-    if (elevenLabsConv) {
-      await elevenLabsConv.sendUserInput(text);
-    } else {
-      const res = await fetch(`https://api.elevenlabs.io/v1/convai/agents/${CHATBOT_CONFIG.agentId}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, conversation_id: customerData.convId || null })
-      });
-      const data = await res.json();
-      if (data.conversation_id) customerData.convId = data.conversation_id;
-      removeTyping();
-      appendMessage('agent', data.response || data.text || '');
-    }
-  } catch (err) {
+  // Rule-based FAQ response
+  showTyping();
+  setTimeout(() => {
     removeTyping();
-    appendMessage('agent', "I'm having a little trouble connecting right now. Please try again or send us a message using the contact form below.");
-  }
+    appendMessage('agent', getBotResponse(text));
+  }, 600);
 }
 
 // ── Voice (ElevenLabs SDK) ───────────────────
@@ -210,12 +294,13 @@ chatbotMicBtn.addEventListener('click', async () => {
 });
 
 async function startVoice() {
-  if (typeof ElevenLabs === 'undefined') {
-    appendMessage('agent', 'Voice is not available right now. Please type your message instead.');
+  const EL = window.ElevenLabsClient || window.ElevenLabs;
+  if (!EL) {
+    appendMessage('agent', 'Voice is not available right now — please type your message instead.');
     return;
   }
   try {
-    const conv = await ElevenLabs.Conversation.startSession({
+    const conv = await EL.Conversation.startSession({
       agentId: CHATBOT_CONFIG.agentId,
       onConnect: () => {
         voiceActive = true;
@@ -229,21 +314,18 @@ async function startVoice() {
         elevenLabsConv = null;
       },
       onMessage: ({ message, source }) => {
-        if (source === 'ai') {
-          appendMessage('agent', message);
-        } else if (source === 'user') {
-          appendMessage('user', message);
-        }
+        if (source === 'ai')   appendMessage('agent', message);
+        if (source === 'user') appendMessage('user',  message);
       },
       onError: (err) => {
         console.error('ElevenLabs error:', err);
-        appendMessage('agent', 'Sorry, there was an issue with the voice connection. Try typing instead.');
+        appendMessage('agent', 'There was an issue with the voice connection. Please try typing instead.');
         stopVoice();
       },
     });
     elevenLabsConv = conv;
   } catch (err) {
-    appendMessage('agent', 'Microphone access is needed for voice. Please allow it or type your message.');
+    appendMessage('agent', 'Microphone access is needed for voice. Please allow it in your browser, or type your message.');
   }
 }
 
