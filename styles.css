@@ -1671,6 +1671,14 @@ strong { font-weight: 600; color: var(--text-primary); }
   }
 
   /* Nav */
+  .nav__logo-img {
+    height: 80px;
+  }
+
+  .footer__logo-img {
+    height: 60px;
+  }
+
   .nav__links,
   .nav__cta {
     display: none;
