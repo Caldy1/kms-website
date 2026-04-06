@@ -191,14 +191,14 @@ strong { font-weight: 600; color: var(--text-primary); }
 }
 
 .nav__logo-img {
-  height: 80px;
+  height: 160px;
   width: auto;
   display: block;
 }
 
 /* Footer logo */
 .footer__logo-img {
-  height: 60px;
+  height: 120px;
   width: auto;
   display: block;
 }
