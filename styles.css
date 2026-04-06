@@ -887,6 +887,14 @@ strong { font-weight: 600; color: var(--text-primary); }
   line-height: 1.8;
 }
 
+/* Contact form card */
+.contact__form-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 42px 40px;
+}
+
 /* Contact form */
 .contact__form {
   text-align: left;
@@ -1519,5 +1527,6 @@ strong { font-weight: 600; color: var(--text-primary); }
   .hero__actions { flex-direction: column; align-items: flex-start; }
   .hero__actions .btn { width: 100%; justify-content: center; }
   .contact__form-row { grid-template-columns: 1fr; }
+  .contact__form-card { padding: 28px 20px; }
   .contact__submit { width: 100%; }
 }
