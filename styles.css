@@ -48,8 +48,8 @@ button { font-family: var(--font-body); }
   --border-hover:  rgba(74, 234, 165, 0.32);
 
   /* Typography */
-  --font-display:  'Syne', sans-serif;
-  --font-body:     'DM Sans', system-ui, sans-serif;
+  --font-display:  'Plus Jakarta Sans', sans-serif;
+  --font-body:     'Plus Jakarta Sans', sans-serif;
 
   /* Spacing & layout */
   --max-width:     1200px;
@@ -168,16 +168,20 @@ strong { font-weight: 600; color: var(--text-primary); }
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 100;
-  padding: 14px 0;
+  padding: 8px 0;
   transition: padding var(--transition), background var(--transition), border-color var(--transition);
 }
 
 .nav.scrolled {
-  background: rgba(6, 15, 12, 0.9);
+  background: rgba(6, 15, 12, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border);
-  padding: 8px 0;
+  padding: 4px 0;
+}
+
+.nav.scrolled .nav__logo-img {
+  height: 100px;
 }
 
 .nav__inner {
@@ -197,7 +201,7 @@ strong { font-weight: 600; color: var(--text-primary); }
 }
 
 .nav__logo-img {
-  height: 80px;
+  height: 160px;
   width: auto;
   display: block;
   filter: brightness(1.8) saturate(1.2);
@@ -302,7 +306,7 @@ strong { font-weight: 600; color: var(--text-primary); }
   display: flex;
   align-items: center;
   overflow: hidden;
-  padding: 150px 0 90px;
+  padding: 200px 0 90px;
 }
 
 /* Animated background orbs */
