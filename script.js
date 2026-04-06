@@ -100,11 +100,9 @@ const chatbotModal      = document.getElementById('chatbotModal');
 const chatbotClose      = document.getElementById('chatbotClose');
 const chatbotOverlay    = document.getElementById('chatbotOverlay');
 const chatbotTranscript = document.getElementById('chatbotTranscript');
-const chatbotForm       = document.getElementById('chatbotForm');
 const chatbotTextInput  = document.getElementById('chatbotTextInput');
 const chatbotSendBtn    = document.getElementById('chatbotSendBtn');
 const chatbotMicBtn     = document.getElementById('chatbotMicBtn');
-const formSubmit        = document.getElementById('formSubmit');
 
 // ── EmailJS init ─────────────────────────────
 if (typeof emailjs !== 'undefined') {
@@ -165,23 +163,17 @@ function removeTyping() {
 
 // ── Text input ───────────────────────────────
 chatbotTextInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
+  if (e.key === 'Enter') {
     e.preventDefault();
     sendTextMessage();
   }
 });
 chatbotSendBtn.addEventListener('click', sendTextMessage);
 
-chatbotTextInput.addEventListener('input', () => {
-  chatbotTextInput.style.height = 'auto';
-  chatbotTextInput.style.height = chatbotTextInput.scrollHeight + 'px';
-});
-
 async function sendTextMessage() {
   const text = chatbotTextInput.value.trim();
   if (!text) return;
   chatbotTextInput.value = '';
-  chatbotTextInput.style.height = 'auto';
   appendMessage('user', text);
   showTyping();
 
@@ -204,11 +196,10 @@ async function sendTextMessage() {
       if (data.conversation_id) customerData.convId = data.conversation_id;
       removeTyping();
       appendMessage('agent', data.response || data.text || '');
-      if (/book|calendar|discovery call/i.test(data.response || '')) triggerBooking();
     }
   } catch (err) {
     removeTyping();
-    appendMessage('agent', "I'm having a little trouble connecting right now. Please try again or book a call directly — the button is below.");
+    appendMessage('agent', "I'm having a little trouble connecting right now. Please try again or send us a message using the contact form below.");
   }
 }
 
@@ -240,7 +231,6 @@ async function startVoice() {
       onMessage: ({ message, source }) => {
         if (source === 'ai') {
           appendMessage('agent', message);
-          if (/book|calendar|discovery call/i.test(message)) triggerBooking();
         } else if (source === 'user') {
           appendMessage('user', message);
         }
@@ -266,55 +256,57 @@ function stopVoice() {
   chatbotMicBtn.setAttribute('aria-pressed', 'false');
 }
 
-// ── Booking trigger ──────────────────────────
-function triggerBooking() {
-  chatbotForm.hidden = false;
-  chatbotForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
+// ── Contact form (EmailJS) ───────────────────
+const contactForm   = document.getElementById('contactForm');
+const contactSubmit = document.getElementById('contactSubmit');
+const contactMsg    = document.getElementById('contactFormMsg');
 
-formSubmit.addEventListener('click', async () => {
-  const name    = document.getElementById('formName').value.trim();
-  const email   = document.getElementById('formEmail').value.trim();
-  const phone   = document.getElementById('formPhone').value.trim();
-  const company = document.getElementById('formCompany').value.trim();
+if (contactForm) {
+  contactForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-  if (!name || !email) {
-    document.getElementById('formName').focus();
-    return;
-  }
+    const name    = document.getElementById('contactName').value.trim();
+    const email   = document.getElementById('contactEmail').value.trim();
+    if (!name || !email) {
+      contactMsg.textContent = 'Please fill in your name and email.';
+      contactMsg.style.color = '#e88';
+      return;
+    }
 
-  customerData = { name, email, phone, company };
+    contactSubmit.disabled = true;
+    contactSubmit.textContent = 'Sending…';
+    contactMsg.textContent = '';
+    contactMsg.style.color = '';
 
-  await sendEmails(customerData);
+    const params = {
+      customer_name:     name,
+      customer_email:    email,
+      customer_phone:    document.getElementById('contactPhone').value.trim()   || 'Not provided',
+      customer_company:  document.getElementById('contactCompany').value.trim() || 'Not provided',
+      customer_interest: document.getElementById('contactService').value        || 'Not specified',
+      customer_time:     'Not specified',
+      customer_source:   'KMS website contact form',
+      calendly_link:     CHATBOT_CONFIG.calendlyLink,
+    };
 
-  const calendlyUrl = `${CHATBOT_CONFIG.calendlyLink}?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
-  if (typeof Calendly !== 'undefined') {
-    Calendly.initPopupWidget({ url: calendlyUrl });
-  } else {
-    window.open(calendlyUrl, '_blank');
-  }
-
-  chatbotForm.hidden = true;
-  appendMessage('agent', `Perfect, ${name}! I've opened the booking calendar for you. We've also sent a confirmation to ${email}. We look forward to speaking with you!`);
-});
-
-// ── EmailJS send ─────────────────────────────
-async function sendEmails(data) {
-  if (typeof emailjs === 'undefined') return;
-  const params = {
-    customer_name:     data.name,
-    customer_email:    data.email,
-    customer_phone:    data.phone    || 'Not provided',
-    customer_company:  data.company  || 'Not provided',
-    customer_interest: data.interest || 'General enquiry',
-    customer_time:     data.time     || 'Not specified',
-    customer_source:   data.source   || 'KMS website chatbot',
-    calendly_link:     CHATBOT_CONFIG.calendlyLink,
-  };
-  await Promise.allSettled([
-    emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateNotify,  params),
-    emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateConfirm, params),
-  ]);
+    try {
+      if (typeof emailjs !== 'undefined') {
+        await Promise.allSettled([
+          emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateNotify,  params),
+          emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateConfirm, params),
+        ]);
+      }
+      contactForm.reset();
+      contactMsg.textContent = "Thanks! We'll be in touch shortly.";
+      contactMsg.style.color = '';
+    } catch (err) {
+      contactMsg.textContent = 'Something went wrong. Please email us directly at hello@kms-ai.co.uk';
+      contactMsg.style.color = '#e88';
+    } finally {
+      contactSubmit.disabled = false;
+      contactSubmit.textContent = 'Send Enquiry';
+    }
+  });
 }
 
 /* ──────────────────────────────────────────
