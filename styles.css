@@ -1672,11 +1672,11 @@ strong { font-weight: 600; color: var(--text-primary); }
 
   /* Nav */
   .nav__logo-img {
-    height: 80px;
+    height: 96px;
   }
 
   .footer__logo-img {
-    height: 60px;
+    height: 72px;
   }
 
   .nav__links,
@@ -1749,9 +1749,12 @@ strong { font-weight: 600; color: var(--text-primary); }
   }
 
   /* Dim background animation orbs on mobile */
-  .hero__orb--1 { opacity: 0.308; }
-  .hero__orb--2 { opacity: 0.101; }
-  .hero__orb--3 { opacity: 0.039; }
+  .hero__orb--1 { opacity: 0.18; }
+  .hero__orb--2 { opacity: 0.06; }
+  .hero__orb--3 { opacity: 0.02; }
+
+  /* Dim canvas neural network on mobile */
+  #heroCanvas { opacity: 0.35; }
 
 }
 
