@@ -87,19 +87,20 @@ const CHATBOT_CONFIG = {
   emailjsServiceId:   'service_hvxfrgk',
   emailjsTemplateNotify:  'template_fjuidou',
   emailjsTemplateConfirm: 'template_a7121wg',
-  sdkUrl:             'https://cdn.jsdelivr.net/npm/@elevenlabs/client/+esm',
+  sdkUrl:             'https://cdn.jsdelivr.net/npm/@11labs/client/+esm',
   sessionMaxSeconds:  300,
   proactiveDelayMs:   45000,
 };
 
 // ── State ────────────────────────────────────
-let elConversation = null;
-let sessionActive  = false;
-let sessionTimer   = null;
-let secondsLeft    = CHATBOT_CONFIG.sessionMaxSeconds;
-let proactiveTimer = null;
-let isPanelOpen    = false;
-let sdkModule      = null;
+let elConversation   = null;
+let sessionActive    = false;
+let sessionTimer     = null;
+let secondsLeft      = CHATBOT_CONFIG.sessionMaxSeconds;
+let proactiveTimer   = null;
+let isPanelOpen      = false;
+let sdkModule        = null;
+let sessionAborted   = false;
 
 // ── DOM refs ────────────────────────────────
 const chatbotBtn         = document.getElementById('chatbotBtn');
@@ -145,13 +146,18 @@ function openPanel() {
 
 function closePanel() {
   isPanelOpen = false;
+  sessionAborted = true;
   chatbotPanel.style.display = 'none';
   chatbotBtn.setAttribute('aria-expanded', 'false');
   chatbotOverlay.classList.remove('active');
   if (sessionActive) {
     endSession(false);
-    resetToStartScreen();
+  } else if (elConversation) {
+    // Connected but onSessionConnected not yet run
+    elConversation.endSession().catch(() => {});
+    elConversation = null;
   }
+  resetToStartScreen();
 }
 
 function resetToStartScreen() {
@@ -213,6 +219,7 @@ chatbotChips.querySelectorAll('.chatbot-chip').forEach((chip) => {
 
 // ── Session init ─────────────────────────────
 async function initSession() {
+  sessionAborted = false;
   chatbotStartScreen.style.display = 'none';
   chatbotLoading.style.display     = 'flex';
 
@@ -221,35 +228,50 @@ async function initSession() {
 
     const { Conversation } = sdkModule || await import(CHATBOT_CONFIG.sdkUrl);
 
-    elConversation = await Conversation.startSession({
-      agentId: CHATBOT_CONFIG.agentId,
+    const connectTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Connection timed out')), 15000)
+    );
 
-      onDisconnect: () => {
-        if (sessionActive) endSession(true);
-      },
+    elConversation = await Promise.race([
+      Conversation.startSession({
+        agentId: CHATBOT_CONFIG.agentId,
 
-      onMessage: (msg) => {
-        if (msg && msg.message) {
-          addMessage(msg.source === 'user' ? 'user' : 'ai', msg.message);
-        }
-      },
+        onDisconnect: () => {
+          if (sessionActive) endSession(true);
+        },
 
-      onModeChange: (modeObj) => {
-        setMode(modeObj && modeObj.mode ? modeObj.mode : 'idle');
-      },
+        onMessage: (msg) => {
+          if (msg && msg.message) {
+            addMessage(msg.source === 'user' ? 'user' : 'ai', msg.message);
+          }
+        },
 
-      onError: (err) => {
-        console.error('[KMS AI]', err);
-        addMessage('system', 'Connection issue — please try again.');
-        endSession(false);
-      },
-    });
+        onModeChange: (modeObj) => {
+          setMode(modeObj && modeObj.mode ? modeObj.mode : 'idle');
+        },
+
+        onError: (err) => {
+          console.error('[KMS AI]', err);
+          addMessage('system', 'Connection issue — please try again.');
+          endSession(false);
+        },
+      }),
+      connectTimeout,
+    ]);
+
+    // If user closed the panel while we were connecting, clean up immediately
+    if (sessionAborted) {
+      elConversation.endSession().catch(() => {});
+      elConversation = null;
+      return;
+    }
 
     // startSession resolves when the WebSocket is connected — show the UI now
     onSessionConnected();
 
   } catch (err) {
     console.error('[KMS AI] Failed to start:', err);
+    if (elConversation) { elConversation.endSession().catch(() => {}); elConversation = null; }
     chatbotLoading.style.display     = 'none';
     chatbotStartScreen.style.display = 'flex';
     const errNote = document.createElement('p');
