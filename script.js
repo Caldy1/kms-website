@@ -39,11 +39,19 @@ window.addEventListener('DOMContentLoaded', () => {
    STICKY NAV
    ────────────────────────────────────────── */
 const nav = document.getElementById('nav');
+let lastScrollY = 0;
 
 window.addEventListener(
   'scroll',
   () => {
-    nav.classList.toggle('scrolled', window.scrollY > 72);
+    const y = window.scrollY;
+    nav.classList.toggle('scrolled', y > 72);
+    if (y > lastScrollY && y > 100) {
+      nav.classList.add('nav--hidden');
+    } else {
+      nav.classList.remove('nav--hidden');
+    }
+    lastScrollY = y;
   },
   { passive: true }
 );

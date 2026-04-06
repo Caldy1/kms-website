@@ -169,7 +169,11 @@ strong { font-weight: 600; color: var(--text-primary); }
   top: 0; left: 0; right: 0;
   z-index: 100;
   padding: 8px 0;
-  transition: padding var(--transition), background var(--transition), border-color var(--transition);
+  transition: padding var(--transition), background var(--transition), border-color var(--transition), transform 0.3s ease;
+}
+
+.nav--hidden {
+  transform: translateY(-100%);
 }
 
 .nav.scrolled {
@@ -199,14 +203,14 @@ strong { font-weight: 600; color: var(--text-primary); }
 }
 
 .nav__logo-img {
-  height: 160px;
+  height: 80px;
   width: auto;
   display: block;
 }
 
 /* Footer logo */
 .footer__logo-img {
-  height: 120px;
+  height: 60px;
   width: auto;
   display: block;
 }
