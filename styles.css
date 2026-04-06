@@ -180,9 +180,6 @@ strong { font-weight: 600; color: var(--text-primary); }
   padding: 4px 0;
 }
 
-.nav.scrolled .nav__logo-img {
-  height: 100px;
-}
 
 .nav__inner {
   max-width: var(--max-width);
@@ -205,20 +202,13 @@ strong { font-weight: 600; color: var(--text-primary); }
   height: 160px;
   width: auto;
   display: block;
-  filter: brightness(1.8) saturate(1.2);
-  transition: filter var(--transition);
-}
-
-.nav__logo:hover .nav__logo-img {
-  filter: brightness(2.2) saturate(1.4);
 }
 
 /* Footer logo */
 .footer__logo-img {
-  height: 88px;
+  height: 120px;
   width: auto;
   display: block;
-  filter: brightness(1.8) saturate(1.2);
 }
 
 /* Footer logo (CSS text fallback) */
