@@ -76,149 +76,307 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ──────────────────────────────────────────
-   CHATBOT — ELEVENLABS + CALENDLY + EMAILJS
+   CHATBOT — ELEVENLABS CONVERSATIONAL AI
    ────────────────────────────────────────── */
 
 // ── Config ──────────────────────────────────
 const CHATBOT_CONFIG = {
-  agentId:               'agent_6501knhfd05yfp6r682wqhwafmc1',
-  calendlyLink:          'https://calendly.com/kyle-calderwood/kms-initial-meeting-webpage',
-  emailjsPublicKey:      'b6WB2n_rerHBuUK2c',
-  emailjsServiceId:      'service_hvxfrgk',
-  emailjsTemplateNotify: 'template_fjuidou',
-  emailjsTemplateConfirm:'template_a7121wg',
+  agentId:            'agent_6501knhfd05yfp6r682wqhwafmc1',
+  calendlyLink:       'https://calendly.com/kyle-calderwood/kms-initial-meeting-webpage',
+  emailjsPublicKey:   'b6WB2n_rerHBuUK2c',
+  emailjsServiceId:   'service_hvxfrgk',
+  emailjsTemplateNotify:  'template_fjuidou',
+  emailjsTemplateConfirm: 'template_a7121wg',
+  sdkUrl:             'https://cdn.jsdelivr.net/npm/@elevenlabs/client/+esm',
+  sessionMaxSeconds:  300,
+  proactiveDelayMs:   45000,
 };
 
 // ── State ────────────────────────────────────
-let elevenLabsConv = null;
-let voiceActive    = false;
+let elConversation = null;
+let sessionActive  = false;
+let sessionTimer   = null;
+let secondsLeft    = CHATBOT_CONFIG.sessionMaxSeconds;
+let proactiveTimer = null;
+let isPanelOpen    = false;
+let sdkModule      = null;
 
 // ── DOM refs ────────────────────────────────
-const chatbotBtn        = document.getElementById('chatbotBtn');
-const chatbotModal      = document.getElementById('chatbotModal');
-const chatbotClose      = document.getElementById('chatbotClose');
-const chatbotOverlay    = document.getElementById('chatbotOverlay');
-const chatbotTranscript = document.getElementById('chatbotTranscript');
-const chatbotMicBtn     = document.getElementById('chatbotMicBtn');
-const chatbotVoiceLabel = document.getElementById('chatbotVoiceLabel');
-const chatbotChips      = document.getElementById('chatbotChips');
+const chatbotBtn         = document.getElementById('chatbotBtn');
+const chatbotPanel       = document.getElementById('chatbotPanel');
+const chatbotClose       = document.getElementById('chatbotClose');
+const chatbotOverlay     = document.getElementById('chatbotOverlay');
+const chatbotStartScreen = document.getElementById('chatbotStartScreen');
+const chatbotStartBtn    = document.getElementById('chatbotStartBtn');
+const chatbotLoading     = document.getElementById('chatbotLoading');
+const chatbotTranscript  = document.getElementById('chatbotTranscript');
+const chatbotChips       = document.getElementById('chatbotChips');
+const chatbotMicArea     = document.getElementById('chatbotMicArea');
+const chatbotMicBtn      = document.getElementById('chatbotMicBtn');
+const chatbotVoiceLabel  = document.getElementById('chatbotVoiceLabel');
+const chatbotSessionEnd  = document.getElementById('chatbotSessionEnd');
+const chatbotTimerEl     = document.getElementById('chatbotTimer');
+const chatbotStatusBar   = document.getElementById('chatbotStatusBar');
+const chatbotStatusText  = document.getElementById('chatbotStatusText');
+const chatbotWaveform    = document.getElementById('chatbotWaveform');
+const chatbotRestartBtn  = document.getElementById('chatbotRestartBtn');
+const chatbotGotoContact = document.getElementById('chatbotGotoContact');
 
-// ── Modal open/close ─────────────────────────
-function openChatbot() {
-  chatbotModal.classList.add('open');
-  chatbotModal.setAttribute('aria-hidden', 'false');
-  chatbotOverlay.classList.add('active');
-  chatbotBtn.setAttribute('aria-expanded', 'true');
-  if (chatbotTranscript.children.length === 0) {
-    appendMessage('agent', "Your business probably runs on repetition. Mine runs on eliminating it. I'm the KMS Assistant — tap the mic to talk, or pick a question below.");
-  }
-  setTimeout(() => chatbotClose.focus(), 350);
-}
-
-function closeChatbot() {
-  chatbotModal.classList.remove('open');
-  chatbotModal.setAttribute('aria-hidden', 'true');
-  chatbotOverlay.classList.remove('active');
-  chatbotBtn.setAttribute('aria-expanded', 'false');
-  if (voiceActive) stopVoice();
-  chatbotBtn.focus();
-}
-
-chatbotBtn.addEventListener('click', openChatbot);
-chatbotClose.addEventListener('click', closeChatbot);
-chatbotOverlay.addEventListener('click', closeChatbot);
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && chatbotModal.classList.contains('open')) closeChatbot();
+// ── Panel open/close ─────────────────────────
+chatbotBtn.addEventListener('click', () => {
+  isPanelOpen ? closePanel() : openPanel();
 });
 
-// ── Transcript helpers ───────────────────────
-function appendMessage(role, text) {
-  const div = document.createElement('div');
-  div.className = `chatbot-msg chatbot-msg--${role}`;
-  div.textContent = text;
-  chatbotTranscript.appendChild(div);
-  chatbotTranscript.scrollTop = chatbotTranscript.scrollHeight;
-  return div;
+chatbotClose.addEventListener('click', closePanel);
+chatbotOverlay.addEventListener('click', closePanel);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && isPanelOpen) closePanel();
+});
+
+function openPanel() {
+  isPanelOpen = true;
+  chatbotPanel.style.display = 'flex';
+  chatbotBtn.setAttribute('aria-expanded', 'true');
+  chatbotOverlay.classList.add('active');
+  removeBadge();
+  clearTimeout(proactiveTimer);
 }
 
+function closePanel() {
+  isPanelOpen = false;
+  chatbotPanel.style.display = 'none';
+  chatbotBtn.setAttribute('aria-expanded', 'false');
+  chatbotOverlay.classList.remove('active');
+  if (sessionActive) {
+    endSession(false);
+    resetToStartScreen();
+  }
+}
+
+function resetToStartScreen() {
+  chatbotTranscript.style.display  = 'none';
+  chatbotChips.style.display       = 'none';
+  chatbotMicArea.style.display     = 'none';
+  chatbotStatusBar.style.display   = 'none';
+  chatbotTimerEl.style.display     = 'none';
+  chatbotSessionEnd.style.display  = 'none';
+  chatbotLoading.style.display     = 'none';
+  chatbotTimerEl.classList.remove('warning');
+  secondsLeft = CHATBOT_CONFIG.sessionMaxSeconds;
+  chatbotTranscript.innerHTML = '';
+  chatbotStartScreen.style.display = 'flex';
+}
+
+// ── Session buttons ──────────────────────────
+chatbotStartBtn.addEventListener('click', () => {
+  // Unlock AudioContext synchronously within user gesture (required for iOS Safari)
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (AudioCtx) {
+    try {
+      const ctx = new AudioCtx();
+      ctx.resume().then(() => ctx.close()).catch(() => {});
+    } catch (e) {}
+  }
+  initSession();
+});
+
+chatbotRestartBtn.addEventListener('click', resetToStartScreen);
+
+chatbotGotoContact.addEventListener('click', () => {
+  closePanel();
+  const contactEl = document.getElementById('contact');
+  if (contactEl) contactEl.scrollIntoView({ behavior: 'smooth' });
+});
+
 // ── Quick chips ──────────────────────────────
-chatbotChips.querySelectorAll('.chatbot-chip[data-question]').forEach((chip) => {
-  chip.addEventListener('click', async () => {
-    const question = chip.dataset.question;
-    chatbotChips.classList.add('hidden');
-    appendMessage('user', question);
-    await startVoice(question);
+chatbotChips.querySelectorAll('.chatbot-chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    if (!sessionActive) return;
+    const hints = {
+      services: 'Say: "What services do you offer?"',
+      how:      'Say: "How does the process work?"',
+      book:     'Say: "I\'d like to book a discovery call"',
+    };
+    const hint = hints[chip.dataset.action];
+    if (!hint) return;
+    const old = chatbotTranscript.querySelector('.chatbot-msg--hint');
+    if (old) old.remove();
+    const hintEl = document.createElement('div');
+    hintEl.className = 'chatbot-msg chatbot-msg--system chatbot-msg--hint';
+    hintEl.textContent = hint;
+    chatbotTranscript.appendChild(hintEl);
+    chatbotTranscript.scrollTop = chatbotTranscript.scrollHeight;
+    setTimeout(() => { if (hintEl.parentNode) hintEl.remove(); }, 4000);
   });
 });
 
-document.getElementById('chatbotBookChip').addEventListener('click', () => {
-  chatbotChips.classList.add('hidden');
-  appendMessage('agent', "Opening the booking calendar for you now — pick whatever time suits.");
-  setTimeout(() => {
-    if (typeof Calendly !== 'undefined') {
-      Calendly.initPopupWidget({ url: CHATBOT_CONFIG.calendlyLink });
-    }
-  }, 600);
-});
+// ── Session init ─────────────────────────────
+async function initSession() {
+  chatbotStartScreen.style.display = 'none';
+  chatbotLoading.style.display     = 'flex';
 
-// ── Voice (ElevenLabs SDK) ───────────────────
-chatbotMicBtn.addEventListener('click', async () => {
-  if (voiceActive) { stopVoice(); return; }
-  chatbotChips.classList.add('hidden');
-  await startVoice();
-});
-
-async function startVoice(initialMessage = null) {
-  const EL = window.ElevenLabsClient || window.ElevenLabs;
-  if (!EL) {
-    appendMessage('agent', 'Voice is not available right now — please try refreshing the page.');
-    return;
-  }
   try {
-    const conv = await EL.Conversation.startSession({
+    await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+
+    const { Conversation } = sdkModule || await import(CHATBOT_CONFIG.sdkUrl);
+
+    elConversation = await Conversation.startSession({
       agentId: CHATBOT_CONFIG.agentId,
-      onConnect: () => {
-        voiceActive = true;
-        chatbotMicBtn.setAttribute('aria-pressed', 'true');
-        chatbotMicBtn.setAttribute('aria-label', 'Stop voice conversation');
-        chatbotVoiceLabel.textContent = 'Listening…';
-      },
+
+      onConnect: () => onSessionConnected(),
+
       onDisconnect: () => {
-        voiceActive = false;
-        chatbotMicBtn.setAttribute('aria-pressed', 'false');
-        chatbotMicBtn.setAttribute('aria-label', 'Start voice conversation');
-        chatbotVoiceLabel.textContent = 'Tap to speak';
-        elevenLabsConv = null;
+        if (sessionActive) endSession(true);
       },
-      onMessage: ({ message, source }) => {
-        if (source === 'ai')   appendMessage('agent', message);
-        if (source === 'user') appendMessage('user',  message);
+
+      onMessage: (msg) => {
+        if (msg && msg.message) {
+          addMessage(msg.source === 'user' ? 'user' : 'ai', msg.message);
+        }
       },
+
+      onModeChange: (modeObj) => {
+        setMode(modeObj && modeObj.mode ? modeObj.mode : 'idle');
+      },
+
       onError: (err) => {
-        console.error('ElevenLabs error:', err);
-        appendMessage('agent', 'There was an issue with the voice connection — please try again.');
-        stopVoice();
+        console.error('[KMS AI]', err);
+        addMessage('system', 'Connection issue — please try again.');
+        endSession(false);
       },
     });
-    elevenLabsConv = conv;
-    if (initialMessage) {
-      await conv.sendUserInput(initialMessage);
-    }
+
   } catch (err) {
-    appendMessage('agent', 'Microphone access is needed for voice. Please allow it in your browser and try again.');
-    chatbotVoiceLabel.textContent = 'Tap to speak';
+    console.error('[KMS AI] Failed to start:', err);
+    chatbotLoading.style.display     = 'none';
+    chatbotStartScreen.style.display = 'flex';
+    const errNote = document.createElement('p');
+    errNote.style.cssText = 'font-size:0.78rem;color:#e88;margin-top:-6px;text-align:center;';
+    errNote.textContent = (err && err.name === 'NotAllowedError')
+      ? 'Microphone access denied. Please allow it and try again.'
+      : 'Could not connect. Please try the contact form below.';
+    chatbotStartBtn.insertAdjacentElement('afterend', errNote);
+    setTimeout(() => errNote.remove(), 6000);
   }
 }
 
-function stopVoice() {
-  if (elevenLabsConv) {
-    elevenLabsConv.endSession();
-    elevenLabsConv = null;
-  }
-  voiceActive = false;
-  chatbotMicBtn.setAttribute('aria-pressed', 'false');
-  chatbotVoiceLabel.textContent = 'Tap to speak';
+function onSessionConnected() {
+  sessionActive = true;
+  chatbotLoading.style.display     = 'none';
+  chatbotTranscript.style.display  = 'flex';
+  chatbotChips.style.display       = 'flex';
+  chatbotMicArea.style.display     = 'flex';
+  chatbotStatusBar.style.display   = 'flex';
+  chatbotTimerEl.style.display     = 'block';
+  chatbotMicBtn.classList.remove('disabled');
+  startSessionTimer();
+  setMode('listening');
 }
+
+// ── Session timer ────────────────────────────
+function startSessionTimer() {
+  secondsLeft = CHATBOT_CONFIG.sessionMaxSeconds;
+  updateTimerDisplay();
+  sessionTimer = setInterval(() => {
+    secondsLeft--;
+    updateTimerDisplay();
+    if (secondsLeft <= 30) chatbotTimerEl.classList.add('warning');
+    if (secondsLeft <= 0)  endSession(true);
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(secondsLeft / 60);
+  const s = secondsLeft % 60;
+  chatbotTimerEl.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+function endSession(showEnd) {
+  sessionActive = false;
+  clearInterval(sessionTimer);
+  if (elConversation) {
+    elConversation.endSession().catch(() => {});
+    elConversation = null;
+  }
+  chatbotMicBtn.classList.add('disabled');
+  setMode('idle');
+  chatbotBtn.classList.remove('speaking');
+  if (showEnd) {
+    chatbotTranscript.style.display = 'none';
+    chatbotChips.style.display      = 'none';
+    chatbotMicArea.style.display    = 'none';
+    chatbotStatusBar.style.display  = 'none';
+    chatbotTimerEl.style.display    = 'none';
+    chatbotSessionEnd.style.display = 'flex';
+  }
+}
+
+// ── Mode / waveform ──────────────────────────
+function setMode(mode) {
+  chatbotWaveform.className = 'chatbot-waveform';
+  chatbotBtn.classList.remove('speaking');
+  chatbotMicBtn.classList.remove('listening');
+  switch (mode) {
+    case 'speaking':
+      chatbotWaveform.classList.add('speaking');
+      chatbotStatusText.textContent = 'Speaking…';
+      chatbotBtn.classList.add('speaking');
+      break;
+    case 'listening':
+      chatbotWaveform.classList.add('listening');
+      chatbotStatusText.textContent = 'Listening…';
+      chatbotMicBtn.classList.add('listening');
+      break;
+    case 'processing':
+      chatbotStatusText.textContent = 'Thinking…';
+      break;
+    default:
+      chatbotStatusText.textContent = 'Ready';
+  }
+}
+
+// ── Transcript ───────────────────────────────
+function addMessage(type, text) {
+  if (!text || !text.trim()) return;
+  const div = document.createElement('div');
+  div.className = `chatbot-msg chatbot-msg--${type}`;
+  div.textContent = text;
+  chatbotTranscript.appendChild(div);
+  chatbotTranscript.scrollTop = chatbotTranscript.scrollHeight;
+}
+
+// ── Pre-load SDK to minimise async hops on first click ───────────────────────
+import(CHATBOT_CONFIG.sdkUrl).then((mod) => { sdkModule = mod; }).catch(() => {});
+
+// ── Proactive badge (45s after page load) ────────────────────────────────────
+proactiveTimer = setTimeout(() => {
+  if (!isPanelOpen && !sessionActive) addBadge('Ask KMS AI');
+}, CHATBOT_CONFIG.proactiveDelayMs);
+
+const contactSection = document.getElementById('contact');
+if (contactSection) {
+  new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting) { clearTimeout(proactiveTimer); removeBadge(); }
+  }, { threshold: 0.3 }).observe(contactSection);
+}
+
+function addBadge(text) {
+  if (chatbotBtn.querySelector('.chatbot-badge')) return;
+  const badge = document.createElement('div');
+  badge.className = 'chatbot-badge';
+  badge.textContent = text;
+  chatbotBtn.appendChild(badge);
+}
+
+function removeBadge() {
+  const b = chatbotBtn.querySelector('.chatbot-badge');
+  if (b) b.remove();
+}
+
+window.addEventListener('pagehide', () => {
+  if (sessionActive && elConversation) elConversation.endSession().catch(() => {});
+});
 
 // ── Contact form (EmailJS) ───────────────────
 const contactForm   = document.getElementById('contactForm');
