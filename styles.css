@@ -165,23 +165,8 @@ strong { font-weight: 600; color: var(--text-primary); }
    NAVIGATION
    ============================================================ */
 .nav {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  z-index: 100;
+  position: static;
   padding: 8px 0;
-  transition: padding var(--transition), background var(--transition), border-color var(--transition), transform 0.3s ease;
-}
-
-.nav--hidden {
-  transform: translateY(-100%);
-}
-
-.nav.scrolled {
-  background: rgba(6, 15, 12, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
-  padding: 4px 0;
 }
 
 
