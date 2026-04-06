@@ -165,8 +165,11 @@ strong { font-weight: 600; color: var(--text-primary); }
    NAVIGATION
    ============================================================ */
 .nav {
-  position: static;
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
   padding: 8px 0;
+  background: transparent;
 }
 
 
@@ -291,7 +294,7 @@ strong { font-weight: 600; color: var(--text-primary); }
   display: flex;
   align-items: center;
   overflow: hidden;
-  padding: 200px 0 90px;
+  padding: 120px 0 90px;
 }
 
 /* Animated background orbs */
