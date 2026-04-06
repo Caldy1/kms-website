@@ -4,6 +4,16 @@ A record of non-obvious issues encountered during development of the KMS website
 
 ---
 
+## 2026-04-06 — ElevenLabs chatbot stuck on loading spinner; mic not released on close
+
+**Problem:** Clicking "Start Voice Chat" granted microphone permission but the loading spinner never cleared and the chat never connected. Closing the panel left the browser microphone indicator (red tab light) active.
+
+**Root cause:** Two separate bugs. First, the SDK package in `sdkUrl` was `@elevenlabs/client` (ElevenLabs' general REST API wrapper) instead of `@11labs/client` (the Conversational AI SDK) — `startSession()` exists in both but hangs indefinitely in the wrong package. Second, `closePanel()` only called `endSession()` when `sessionActive` was true; closing during the loading phase left `sessionActive = false` so no cleanup ran and the mic stream stayed alive.
+
+**Fix:** Changed `sdkUrl` to `https://cdn.jsdelivr.net/npm/@11labs/client/+esm`. Added a `sessionAborted` flag — set on `closePanel()`, checked after `startSession()` resolves to immediately call `endSession()` if the user closed mid-connect. Added a 15-second `Promise.race` timeout so the spinner always clears if connection fails.
+
+**Lesson:** ElevenLabs has two distinct npm packages — `@elevenlabs/client` (general API) and `@11labs/client` (Conversational AI SDK). Only `@11labs/client` exports a working `Conversation.startSession()`. When building cleanup for async connection flows, always handle the case where the user cancels before the Promise resolves — `sessionActive` will still be false, so guard flags or post-resolve checks are needed to trigger teardown.
+
 ## 2026-04-06 — Logo image not rendering after src path update
 
 **Problem:** After updating `index.html` to reference `Company_Logo/KMS_logo_white.png`, the logo showed a broken image icon on the live site.
