@@ -81,12 +81,12 @@ document.addEventListener('keydown', (e) => {
 
 // ── Config ──────────────────────────────────
 const CHATBOT_CONFIG = {
-  agentId:               'ELEVENLABS_AGENT_ID',
-  calendlyLink:          'CALENDLY_LINK',
-  emailjsPublicKey:      'EMAILJS_PUBLIC_KEY',
-  emailjsServiceId:      'EMAILJS_SERVICE_ID',
-  emailjsTemplateNotify: 'EMAILJS_TEMPLATE_NOTIFY',
-  emailjsTemplateConfirm:'EMAILJS_TEMPLATE_CONFIRM',
+  agentId:               'agent_6501knhfd05yfp6r682wqhwafmc1',
+  calendlyLink:          'https://calendly.com/kyle-calderwood/kms-initial-meeting-webpage',
+  emailjsPublicKey:      'b6WB2n_rerHBuUK2c',
+  emailjsServiceId:      'service_hvxfrgk',
+  emailjsTemplateNotify: 'template_fjuidou',
+  emailjsTemplateConfirm:'template_a7121wg',
 };
 
 // ── State ────────────────────────────────────
