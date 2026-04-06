@@ -4,6 +4,16 @@ A record of non-obvious issues encountered during development of the KMS website
 
 ---
 
+## 2026-04-06 — Logo image not rendering after src path update
+
+**Problem:** After updating `index.html` to reference `Company_Logo/KMS_logo_white.png`, the logo showed a broken image icon on the live site.
+
+**Root cause:** The PNG file existed locally but had never been committed to git, so it wasn't present in the GitHub repo and Netlify had nothing to serve.
+
+**Fix:** Ran `git add Company_Logo/KMS_logo_white.png` and pushed the asset separately after the HTML change was already live.
+
+**Lesson:** When switching to a new image asset, always check `git status` to confirm the file is tracked before pushing the HTML change. New files in `Company_Logo/` (or any asset folder) are untracked by default and must be explicitly added.
+
 ## 2026-04-06 — Mobile hero background animation too bright — no media query overrides existed
 
 **Problem:** The hero section background orbs (animated blurred gradients) appeared too bright on mobile devices, making the page feel visually overwhelming on small screens.
