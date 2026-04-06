@@ -1673,7 +1673,7 @@ strong { font-weight: 600; color: var(--text-primary); }
   /* Nav */
   .nav__logo-img {
     height: 96px;
-    margin-left: -12px;
+    margin-left: -24px;
   }
 
   .footer__logo-img {
