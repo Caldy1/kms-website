@@ -224,8 +224,6 @@ async function initSession() {
     elConversation = await Conversation.startSession({
       agentId: CHATBOT_CONFIG.agentId,
 
-      onConnect: () => onSessionConnected(),
-
       onDisconnect: () => {
         if (sessionActive) endSession(true);
       },
@@ -246,6 +244,9 @@ async function initSession() {
         endSession(false);
       },
     });
+
+    // startSession resolves when the WebSocket is connected — show the UI now
+    onSessionConnected();
 
   } catch (err) {
     console.error('[KMS AI] Failed to start:', err);
