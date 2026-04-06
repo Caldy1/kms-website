@@ -327,7 +327,7 @@ strong { font-weight: 600; color: var(--text-primary); }
   background: radial-gradient(circle, var(--teal-deep) 0%, var(--green-dark) 60%, transparent 80%);
   top: -250px;
   left: -150px;
-  opacity: 0.55;
+  opacity: 0.715;
   animation: drift1 20s ease-in-out infinite;
 }
 
@@ -337,7 +337,7 @@ strong { font-weight: 600; color: var(--text-primary); }
   background: radial-gradient(circle, var(--teal-mid) 0%, transparent 70%);
   bottom: -100px;
   right: 5%;
-  opacity: 0.18;
+  opacity: 0.234;
   animation: drift2 25s ease-in-out infinite;
 }
 
@@ -347,7 +347,7 @@ strong { font-weight: 600; color: var(--text-primary); }
   background: radial-gradient(circle, var(--gold) 0%, transparent 70%);
   top: 30%;
   right: 22%;
-  opacity: 0.07;
+  opacity: 0.091;
   animation: drift3 18s ease-in-out infinite;
 }
 
@@ -1311,6 +1311,11 @@ strong { font-weight: 600; color: var(--text-primary); }
     right: 18px;
     bottom: 96px;
   }
+
+  /* Dim background animation orbs on mobile */
+  .hero__orb--1 { opacity: 0.308; }
+  .hero__orb--2 { opacity: 0.101; }
+  .hero__orb--3 { opacity: 0.039; }
 
 }
 
