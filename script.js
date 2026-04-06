@@ -140,16 +140,16 @@ function initHeroCanvas() {
   resize();
   window.addEventListener('resize', resize, { passive: true });
 
-  const COUNT    = 65;
-  const MAX_DIST = 190;
+  const COUNT    = 80;
+  const MAX_DIST = 220;
 
   const nodes = Array.from({ length: COUNT }, () => ({
     x:  Math.random() * canvas.width,
     y:  Math.random() * canvas.height,
-    vx: (Math.random() - 0.5) * 0.32,
-    vy: (Math.random() - 0.5) * 0.32,
-    r:  Math.random() * 1.4 + 0.5,
-    o:  Math.random() * 0.25 + 0.15,
+    vx: (Math.random() - 0.5) * 0.45,
+    vy: (Math.random() - 0.5) * 0.45,
+    r:  Math.random() * 2 + 1,
+    o:  Math.random() * 0.35 + 0.45,  // 0.45 – 0.80 opacity
   }));
 
   function frame() {
@@ -162,10 +162,10 @@ function initHeroCanvas() {
         const dy   = nodes[i].y - nodes[j].y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < MAX_DIST) {
-          const alpha = (1 - dist / MAX_DIST) * 0.12;
+          const alpha = (1 - dist / MAX_DIST) * 0.35;  // up from 0.12
           ctx.beginPath();
           ctx.strokeStyle = `rgba(74,234,165,${alpha})`;
-          ctx.lineWidth   = 0.7;
+          ctx.lineWidth   = 0.9;
           ctx.moveTo(nodes[i].x, nodes[i].y);
           ctx.lineTo(nodes[j].x, nodes[j].y);
           ctx.stroke();
@@ -173,8 +173,18 @@ function initHeroCanvas() {
       }
     }
 
-    // Draw nodes
+    // Draw nodes with a subtle glow
     nodes.forEach((n) => {
+      // Glow halo
+      const grd = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r * 4);
+      grd.addColorStop(0, `rgba(74,234,165,${n.o * 0.4})`);
+      grd.addColorStop(1, 'rgba(74,234,165,0)');
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r * 4, 0, Math.PI * 2);
+      ctx.fillStyle = grd;
+      ctx.fill();
+
+      // Core dot
       ctx.beginPath();
       ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(74,234,165,${n.o})`;
