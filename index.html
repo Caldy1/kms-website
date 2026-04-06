@@ -379,28 +379,63 @@
       <div>
         <div class="chatbot-modal__name">KMS AI Assistant</div>
         <div class="chatbot-modal__status">
-          <span class="chatbot-modal__dot" aria-hidden="true"></span> Coming Soon
+          <span class="chatbot-modal__dot" aria-hidden="true"></span> Online
         </div>
       </div>
       <button class="chatbot-modal__close" id="chatbotClose" aria-label="Close chat">
         <svg viewBox="0 0 16 16" fill="none" width="16" height="16"><path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
     </div>
-    <div class="chatbot-modal__body">
-      <!-- CHATBOT_PLACEHOLDER: Replace this section with your chatbot embed -->
-      <div class="chatbot-placeholder">
-        <div class="chatbot-placeholder__icon" aria-hidden="true">
-          <span class="spark">✦</span>
-        </div>
-        <h4>Your AI Assistant Is Being Configured</h4>
-        <p>We're setting up your personalised KMS AI agent. In the meantime, book a discovery call and we'll show you exactly what it can do for your business.</p>
-        <a href="#contact" class="btn btn--primary" id="chatbotCTA">Book a Discovery Call</a>
+    <div class="chatbot-modal__body" id="chatbotBody">
+
+      <!-- CONVERSATION TRANSCRIPT -->
+      <div class="chatbot-transcript" id="chatbotTranscript" role="log" aria-live="polite" aria-label="Conversation">
+        <!-- Messages injected by JS -->
       </div>
-      <!-- END CHATBOT_PLACEHOLDER -->
+
+      <!-- DATA COLLECTION FORM (hidden until booking is triggered) -->
+      <div class="chatbot-form" id="chatbotForm" hidden>
+        <p class="chatbot-form__label">To book your discovery call, please confirm your details:</p>
+        <input type="text"  id="formName"    class="chatbot-input-field" placeholder="Full name"     autocomplete="name" />
+        <input type="email" id="formEmail"   class="chatbot-input-field" placeholder="Email address" autocomplete="email" />
+        <input type="tel"   id="formPhone"   class="chatbot-input-field" placeholder="Phone number"   autocomplete="tel" />
+        <input type="text"  id="formCompany" class="chatbot-input-field" placeholder="Company name" />
+        <button class="btn btn--primary chatbot-form__submit" id="formSubmit">Book My Discovery Call</button>
+      </div>
+
+      <!-- INPUT BAR -->
+      <div class="chatbot-input-bar" id="chatbotInputBar">
+        <textarea
+          id="chatbotTextInput"
+          class="chatbot-textarea"
+          placeholder="Type a message…"
+          rows="1"
+          aria-label="Type your message"
+        ></textarea>
+        <button class="chatbot-send-btn" id="chatbotSendBtn" aria-label="Send message">
+          <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+            <path d="M2 10L18 2L12 18L10 11L2 10Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="chatbot-mic-btn" id="chatbotMicBtn" aria-label="Start voice conversation" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
+            <rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
     </div>
   </div>
   <div class="chatbot-overlay" id="chatbotOverlay" aria-hidden="true"></div>
 
+  <!-- ElevenLabs Conversational AI -->
+  <script src="https://cdn.jsdelivr.net/npm/@11labs/client@latest/dist/elevenlabs-client.min.js"></script>
+  <!-- Calendly Widget -->
+  <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet">
+  <script src="https://assets.calendly.com/assets/external/widget.js"></script>
+  <!-- EmailJS -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

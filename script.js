@@ -76,20 +76,50 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ──────────────────────────────────────────
-   CHATBOT MODAL
+   CHATBOT — ELEVENLABS + CALENDLY + EMAILJS
    ────────────────────────────────────────── */
-const chatbotBtn     = document.getElementById('chatbotBtn');
-const chatbotModal   = document.getElementById('chatbotModal');
-const chatbotClose   = document.getElementById('chatbotClose');
-const chatbotOverlay = document.getElementById('chatbotOverlay');
-const chatbotCTA     = document.getElementById('chatbotCTA');
 
+// ── Config ──────────────────────────────────
+const CHATBOT_CONFIG = {
+  agentId:               'ELEVENLABS_AGENT_ID',
+  calendlyLink:          'CALENDLY_LINK',
+  emailjsPublicKey:      'EMAILJS_PUBLIC_KEY',
+  emailjsServiceId:      'EMAILJS_SERVICE_ID',
+  emailjsTemplateNotify: 'EMAILJS_TEMPLATE_NOTIFY',
+  emailjsTemplateConfirm:'EMAILJS_TEMPLATE_CONFIRM',
+};
+
+// ── State ────────────────────────────────────
+let elevenLabsConv = null;
+let voiceActive    = false;
+let customerData   = {};
+
+// ── DOM refs ────────────────────────────────
+const chatbotBtn        = document.getElementById('chatbotBtn');
+const chatbotModal      = document.getElementById('chatbotModal');
+const chatbotClose      = document.getElementById('chatbotClose');
+const chatbotOverlay    = document.getElementById('chatbotOverlay');
+const chatbotTranscript = document.getElementById('chatbotTranscript');
+const chatbotForm       = document.getElementById('chatbotForm');
+const chatbotTextInput  = document.getElementById('chatbotTextInput');
+const chatbotSendBtn    = document.getElementById('chatbotSendBtn');
+const chatbotMicBtn     = document.getElementById('chatbotMicBtn');
+const formSubmit        = document.getElementById('formSubmit');
+
+// ── EmailJS init ─────────────────────────────
+if (typeof emailjs !== 'undefined') {
+  emailjs.init({ publicKey: CHATBOT_CONFIG.emailjsPublicKey });
+}
+
+// ── Modal open/close ─────────────────────────
 function openChatbot() {
   chatbotModal.classList.add('open');
   chatbotModal.setAttribute('aria-hidden', 'false');
   chatbotOverlay.classList.add('active');
   chatbotBtn.setAttribute('aria-expanded', 'true');
-  // Focus the close button for accessibility
+  if (chatbotTranscript.children.length === 0) {
+    appendMessage('agent', "Hi there! I'm the KMS AI Assistant. I can tell you about our services or help you book a discovery call. What would you like to know?");
+  }
   setTimeout(() => chatbotClose.focus(), 350);
 }
 
@@ -98,24 +128,194 @@ function closeChatbot() {
   chatbotModal.setAttribute('aria-hidden', 'true');
   chatbotOverlay.classList.remove('active');
   chatbotBtn.setAttribute('aria-expanded', 'false');
+  if (voiceActive) stopVoice();
   chatbotBtn.focus();
 }
 
 chatbotBtn.addEventListener('click', openChatbot);
 chatbotClose.addEventListener('click', closeChatbot);
 chatbotOverlay.addEventListener('click', closeChatbot);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && chatbotModal.classList.contains('open')) closeChatbot();
+});
 
-// Close chatbot when CTA is clicked (takes user to contact section)
-if (chatbotCTA) {
-  chatbotCTA.addEventListener('click', closeChatbot);
+// ── Transcript helpers ───────────────────────
+function appendMessage(role, text) {
+  const div = document.createElement('div');
+  div.className = `chatbot-msg chatbot-msg--${role}`;
+  div.textContent = text;
+  chatbotTranscript.appendChild(div);
+  chatbotTranscript.scrollTop = chatbotTranscript.scrollHeight;
+  return div;
 }
 
-// Close chatbot on Escape
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && chatbotModal.classList.contains('open')) {
-    closeChatbot();
+function showTyping() {
+  const div = document.createElement('div');
+  div.className = 'chatbot-msg chatbot-msg--typing';
+  div.id = 'chatbotTyping';
+  div.innerHTML = '<span class="dots-anim">···</span>';
+  chatbotTranscript.appendChild(div);
+  chatbotTranscript.scrollTop = chatbotTranscript.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('chatbotTyping');
+  if (t) t.remove();
+}
+
+// ── Text input ───────────────────────────────
+chatbotTextInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendTextMessage();
   }
 });
+chatbotSendBtn.addEventListener('click', sendTextMessage);
+
+chatbotTextInput.addEventListener('input', () => {
+  chatbotTextInput.style.height = 'auto';
+  chatbotTextInput.style.height = chatbotTextInput.scrollHeight + 'px';
+});
+
+async function sendTextMessage() {
+  const text = chatbotTextInput.value.trim();
+  if (!text) return;
+  chatbotTextInput.value = '';
+  chatbotTextInput.style.height = 'auto';
+  appendMessage('user', text);
+  showTyping();
+
+  if (/book|call|calendly|schedule|appointment/i.test(text)) {
+    removeTyping();
+    triggerBooking();
+    return;
+  }
+
+  try {
+    if (elevenLabsConv) {
+      await elevenLabsConv.sendUserInput(text);
+    } else {
+      const res = await fetch(`https://api.elevenlabs.io/v1/convai/agents/${CHATBOT_CONFIG.agentId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, conversation_id: customerData.convId || null })
+      });
+      const data = await res.json();
+      if (data.conversation_id) customerData.convId = data.conversation_id;
+      removeTyping();
+      appendMessage('agent', data.response || data.text || '');
+      if (/book|calendar|discovery call/i.test(data.response || '')) triggerBooking();
+    }
+  } catch (err) {
+    removeTyping();
+    appendMessage('agent', "I'm having a little trouble connecting right now. Please try again or book a call directly — the button is below.");
+  }
+}
+
+// ── Voice (ElevenLabs SDK) ───────────────────
+chatbotMicBtn.addEventListener('click', async () => {
+  if (voiceActive) { stopVoice(); return; }
+  await startVoice();
+});
+
+async function startVoice() {
+  if (typeof ElevenLabs === 'undefined') {
+    appendMessage('agent', 'Voice is not available right now. Please type your message instead.');
+    return;
+  }
+  try {
+    const conv = await ElevenLabs.Conversation.startSession({
+      agentId: CHATBOT_CONFIG.agentId,
+      onConnect: () => {
+        voiceActive = true;
+        chatbotMicBtn.setAttribute('aria-pressed', 'true');
+        chatbotMicBtn.setAttribute('aria-label', 'Stop voice conversation');
+      },
+      onDisconnect: () => {
+        voiceActive = false;
+        chatbotMicBtn.setAttribute('aria-pressed', 'false');
+        chatbotMicBtn.setAttribute('aria-label', 'Start voice conversation');
+        elevenLabsConv = null;
+      },
+      onMessage: ({ message, source }) => {
+        if (source === 'ai') {
+          appendMessage('agent', message);
+          if (/book|calendar|discovery call/i.test(message)) triggerBooking();
+        } else if (source === 'user') {
+          appendMessage('user', message);
+        }
+      },
+      onError: (err) => {
+        console.error('ElevenLabs error:', err);
+        appendMessage('agent', 'Sorry, there was an issue with the voice connection. Try typing instead.');
+        stopVoice();
+      },
+    });
+    elevenLabsConv = conv;
+  } catch (err) {
+    appendMessage('agent', 'Microphone access is needed for voice. Please allow it or type your message.');
+  }
+}
+
+function stopVoice() {
+  if (elevenLabsConv) {
+    elevenLabsConv.endSession();
+    elevenLabsConv = null;
+  }
+  voiceActive = false;
+  chatbotMicBtn.setAttribute('aria-pressed', 'false');
+}
+
+// ── Booking trigger ──────────────────────────
+function triggerBooking() {
+  chatbotForm.hidden = false;
+  chatbotForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+formSubmit.addEventListener('click', async () => {
+  const name    = document.getElementById('formName').value.trim();
+  const email   = document.getElementById('formEmail').value.trim();
+  const phone   = document.getElementById('formPhone').value.trim();
+  const company = document.getElementById('formCompany').value.trim();
+
+  if (!name || !email) {
+    document.getElementById('formName').focus();
+    return;
+  }
+
+  customerData = { name, email, phone, company };
+
+  await sendEmails(customerData);
+
+  const calendlyUrl = `${CHATBOT_CONFIG.calendlyLink}?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
+  if (typeof Calendly !== 'undefined') {
+    Calendly.initPopupWidget({ url: calendlyUrl });
+  } else {
+    window.open(calendlyUrl, '_blank');
+  }
+
+  chatbotForm.hidden = true;
+  appendMessage('agent', `Perfect, ${name}! I've opened the booking calendar for you. We've also sent a confirmation to ${email}. We look forward to speaking with you!`);
+});
+
+// ── EmailJS send ─────────────────────────────
+async function sendEmails(data) {
+  if (typeof emailjs === 'undefined') return;
+  const params = {
+    customer_name:     data.name,
+    customer_email:    data.email,
+    customer_phone:    data.phone    || 'Not provided',
+    customer_company:  data.company  || 'Not provided',
+    customer_interest: data.interest || 'General enquiry',
+    customer_time:     data.time     || 'Not specified',
+    customer_source:   data.source   || 'KMS website chatbot',
+    calendly_link:     CHATBOT_CONFIG.calendlyLink,
+  };
+  await Promise.allSettled([
+    emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateNotify,  params),
+    emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateConfirm, params),
+  ]);
+}
 
 /* ──────────────────────────────────────────
    HERO CANVAS — NEURAL NETWORK ANIMATION
