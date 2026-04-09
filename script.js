@@ -101,7 +101,9 @@ let sessionPaused    = false;
 let proactiveTimer   = null;
 let isPanelOpen      = false;
 let sdkModule        = null;
-let sessionAborted   = false;
+let sessionAborted      = false;
+let suppressNextUserMsg = false;  // hide system-injected user messages from transcript
+let pendingBookingParams = null;  // stored so confirmBooking can send emails from either path
 
 // ── DOM refs ────────────────────────────────
 const chatbotBtn         = document.getElementById('chatbotBtn');
@@ -241,6 +243,22 @@ async function sendBookingEmails(params) {
   ]);
 }
 
+// ── Booking confirmed ────────────────────────
+function confirmBooking(rescheduleUrl = '') {
+  sessionPaused = false;
+  chatbotTimerEl.style.opacity = '';
+  if (pendingBookingParams) {
+    sendBookingEmails({ ...pendingBookingParams, source: 'KMS AI voice chatbot', rescheduleUrl }).catch(() => {});
+    pendingBookingParams = null;
+  }
+  addMessage('system', "We've received your booking. We look forward to speaking to you.");
+  if (elConversation && elConversation.sendUserMessage) {
+    suppressNextUserMsg = true;
+    elConversation.sendUserMessage("My booking is confirmed! I just finished scheduling.");
+  }
+  setTimeout(() => endSession(true), 10000);
+}
+
 // ── Session init ─────────────────────────────
 async function initSession() {
   sessionAborted = false;
@@ -263,6 +281,7 @@ async function initSession() {
         clientTools: {
           book_discovery_call: async (params = {}) => {
             const { name = '', email = '', phone = '', company = '', service = '', message = '' } = params;
+            pendingBookingParams = { name, email, phone, company, service, message };
             addMessage('system', 'Opening your booking calendar…');
             openCalendly({ name, email });
 
@@ -270,29 +289,38 @@ async function initSession() {
             sessionPaused = true;
             chatbotTimerEl.style.opacity = '0.35';
 
-            return new Promise((resolve) => {
-              // Timeout after 10 minutes in case they close Calendly without booking
-              const giveUp = setTimeout(() => {
-                window.removeEventListener('message', onCalendlyMsg);
-                sessionPaused = false;
-                chatbotTimerEl.style.opacity = '';
-                resolve('The booking calendar was shown but no slot was confirmed. Ask if the user would like to try again or use the contact form instead.');
-              }, 10 * 60 * 1000);
+            // Listen for booking confirmation separately — tool resolves immediately
+            // so the agent can speak the "just ask" message without a pending Promise blocking it
+            const giveUp = setTimeout(() => {
+              window.removeEventListener('message', onCalendlyMsg);
+              sessionPaused = false;
+              chatbotTimerEl.style.opacity = '';
+            }, 10 * 60 * 1000);
 
-              function onCalendlyMsg(e) {
-                if (!e.data || e.data.event !== 'calendly.event_scheduled') return;
-                clearTimeout(giveUp);
-                window.removeEventListener('message', onCalendlyMsg);
-                sessionPaused = false;
-                chatbotTimerEl.style.opacity = '';
-                const rescheduleUrl = e.data.payload?.invitee?.reschedule_url || '';
-                sendBookingEmails({ name, email, phone, company, service, message, source: 'KMS AI voice chatbot', rescheduleUrl }).catch(() => {});
-                addMessage('system', 'Call booked!');
-                resolve('The user has successfully booked their discovery call. Congratulate them warmly and let them know what to expect next.');
+            function onCalendlyMsg(e) {
+              // Calendly may send data as an object or a JSON string
+              let data = e.data;
+              if (typeof data === 'string') {
+                try { data = JSON.parse(data); } catch { return; }
               }
+              if (!data || data.event !== 'calendly.event_scheduled') return;
+              clearTimeout(giveUp);
+              window.removeEventListener('message', onCalendlyMsg);
+              sessionPaused = false;
+              chatbotTimerEl.style.opacity = '';
+              const rescheduleUrl = data.payload?.invitee?.reschedule_url || '';
+              confirmBooking(rescheduleUrl);
+            }
 
-              window.addEventListener('message', onCalendlyMsg);
-            });
+            window.addEventListener('message', onCalendlyMsg);
+
+            // Resolve immediately so the agent can speak the "just ask" message
+            return "The booking calendar is now open on screen. Say: \"If you have any questions while you book, just ask!\" Then wait silently. When you receive a message that the booking is confirmed, warmly congratulate the user, tell them you look forward to speaking with them, and say goodbye.";
+          },
+
+          end_call: async () => {
+            confirmBooking();
+            return 'ok';
           },
         },
 
@@ -302,6 +330,10 @@ async function initSession() {
 
         onMessage: (msg) => {
           if (msg && msg.message) {
+            if (msg.source === 'user' && suppressNextUserMsg) {
+              suppressNextUserMsg = false;
+              return;
+            }
             addMessage(msg.source === 'user' ? 'user' : 'ai', msg.message);
           }
         },
@@ -378,6 +410,8 @@ function updateTimerDisplay() {
 
 function endSession(showEnd) {
   sessionActive = false;
+  suppressNextUserMsg = false;
+  pendingBookingParams = null;
   clearInterval(sessionTimer);
   if (elConversation) {
     elConversation.endSession().catch(() => {});
