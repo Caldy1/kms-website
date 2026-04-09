@@ -429,6 +429,7 @@ if (contactForm) {
       customer_phone:    document.getElementById('contactPhone').value.trim()   || 'Not provided',
       customer_company:  document.getElementById('contactCompany').value.trim() || 'Not provided',
       customer_interest: document.getElementById('contactService').value        || 'Not specified',
+      customer_message:  document.getElementById('contactMessage').value.trim() || 'Not provided',
       customer_time:     'Not specified',
       customer_source:   'KMS website contact form',
       calendly_link:     CHATBOT_CONFIG.calendlyLink,
@@ -437,13 +438,16 @@ if (contactForm) {
     try {
       if (typeof emailjs !== 'undefined') {
         await Promise.allSettled([
-          emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateNotify,  params),
-          emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateConfirm, params),
+          emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateNotify,  params, { publicKey: CHATBOT_CONFIG.emailjsPublicKey }),
+          emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateConfirm, params, { publicKey: CHATBOT_CONFIG.emailjsPublicKey }),
         ]);
       }
       contactForm.reset();
       contactMsg.textContent = "Thanks! We'll be in touch shortly.";
       contactMsg.style.color = '';
+      if (typeof Calendly !== 'undefined') {
+        Calendly.showPopupWidget(CHATBOT_CONFIG.calendlyLink);
+      }
     } catch (err) {
       contactMsg.textContent = 'Something went wrong. Please email us directly at hello@kms-ai.co.uk';
       contactMsg.style.color = '#e88';
@@ -535,6 +539,20 @@ function initHeroCanvas() {
 }
 
 initHeroCanvas();
+
+/* ──────────────────────────────────────────
+   CALENDLY POPUP — CTA BUTTONS
+   ────────────────────────────────────────── */
+[document.querySelector('.nav__cta'), document.querySelector('.hero__actions .btn--primary')].forEach((el) => {
+  if (!el) return;
+  el.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (typeof Calendly !== 'undefined') {
+      Calendly.showPopupWidget(CHATBOT_CONFIG.calendlyLink);
+    }
+  });
+});
 
 /* ──────────────────────────────────────────
    SMOOTH SCROLL (for browsers that need it)
