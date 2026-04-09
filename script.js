@@ -231,8 +231,9 @@ async function sendBookingEmails(params) {
     customer_interest: params.service || 'Discovery Call',
     customer_message:  params.message || 'Not provided',
     customer_time:     'Not specified',
-    customer_source:   params.source  || 'KMS website',
+    customer_source:   params.source        || 'KMS website',
     calendly_link:     CHATBOT_CONFIG.calendlyLink,
+    reschedule_url:    params.rescheduleUrl || '',
   };
   await Promise.allSettled([
     emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateNotify,  data, { publicKey: CHATBOT_CONFIG.emailjsPublicKey }),
@@ -263,7 +264,6 @@ async function initSession() {
           book_discovery_call: async (params = {}) => {
             const { name = '', email = '', phone = '', company = '', service = '', message = '' } = params;
             addMessage('system', 'Opening your booking calendar…');
-            sendBookingEmails({ name, email, phone, company, service, message, source: 'KMS AI voice chatbot' }).catch(() => {});
             openCalendly({ name, email });
 
             // Pause the session timer while the user is in Calendly
@@ -285,6 +285,8 @@ async function initSession() {
                 window.removeEventListener('message', onCalendlyMsg);
                 sessionPaused = false;
                 chatbotTimerEl.style.opacity = '';
+                const rescheduleUrl = e.data.payload?.invitee?.reschedule_url || '';
+                sendBookingEmails({ name, email, phone, company, service, message, source: 'KMS AI voice chatbot', rescheduleUrl }).catch(() => {});
                 addMessage('system', 'Call booked!');
                 resolve('The user has successfully booked their discovery call. Congratulate them warmly and let them know what to expect next.');
               }
