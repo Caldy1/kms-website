@@ -97,6 +97,7 @@ let elConversation   = null;
 let sessionActive    = false;
 let sessionTimer     = null;
 let secondsLeft      = CHATBOT_CONFIG.sessionMaxSeconds;
+let sessionPaused    = false;
 let proactiveTimer   = null;
 let isPanelOpen      = false;
 let sdkModule        = null;
@@ -264,7 +265,32 @@ async function initSession() {
             addMessage('system', 'Opening your booking calendar…');
             sendBookingEmails({ name, email, phone, company, service, source: 'KMS AI voice chatbot' }).catch(() => {});
             openCalendly({ name, email });
-            return 'Booking calendar opened. The user will now see the Calendly scheduling page.';
+
+            // Pause the session timer while the user is in Calendly
+            sessionPaused = true;
+            chatbotTimerEl.style.opacity = '0.35';
+
+            return new Promise((resolve) => {
+              // Timeout after 10 minutes in case they close Calendly without booking
+              const giveUp = setTimeout(() => {
+                window.removeEventListener('message', onCalendlyMsg);
+                sessionPaused = false;
+                chatbotTimerEl.style.opacity = '';
+                resolve('The booking calendar was shown but no slot was confirmed. Ask if the user would like to try again or use the contact form instead.');
+              }, 10 * 60 * 1000);
+
+              function onCalendlyMsg(e) {
+                if (!e.data || e.data.event !== 'calendly.event_scheduled') return;
+                clearTimeout(giveUp);
+                window.removeEventListener('message', onCalendlyMsg);
+                sessionPaused = false;
+                chatbotTimerEl.style.opacity = '';
+                addMessage('system', 'Call booked!');
+                resolve('The user has successfully booked their discovery call. Congratulate them warmly and let them know what to expect next.');
+              }
+
+              window.addEventListener('message', onCalendlyMsg);
+            });
           },
         },
 
@@ -336,6 +362,7 @@ function startSessionTimer() {
   sessionTimer = setInterval(() => {
     secondsLeft--;
     updateTimerDisplay();
+    if (sessionPaused) return;
     if (secondsLeft <= 30) chatbotTimerEl.classList.add('warning');
     if (secondsLeft <= 0)  endSession(true);
   }, 1000);
