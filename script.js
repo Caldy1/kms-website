@@ -142,6 +142,8 @@ function openPanel() {
   chatbotOverlay.classList.add('active');
   removeBadge();
   clearTimeout(proactiveTimer);
+  // Pre-warm mic permission so it's already granted when user clicks Start
+  navigator.mediaDevices.getUserMedia({ audio: true, video: false }).catch(() => {});
 }
 
 function closePanel() {
@@ -553,15 +555,7 @@ function openCalendly(prefill = {}) {
   Calendly.showPopupWidget(url);
 }
 
-// CTA buttons → open Calendly popup
-[document.querySelector('.nav__cta'), document.querySelector('.hero__actions .btn--primary')].forEach((el) => {
-  if (!el) return;
-  el.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    openCalendly();
-  });
-});
+// CTA buttons scroll to contact form (smooth scroll handles these via a[href="#contact"])
 
 /* ──────────────────────────────────────────
    SMOOTH SCROLL (for browsers that need it)
