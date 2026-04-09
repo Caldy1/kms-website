@@ -4,6 +4,26 @@ A record of non-obvious issues encountered during development of the KMS website
 
 ---
 
+## 2026-04-09 — ElevenLabs voice chatbot booking flow: Calendly confirmation not detected; call not ending
+
+**Problem:** After a user completed a Calendly booking, the chatbot didn't detect it, didn't show the confirmation message, and didn't end the call. When the user verbally said they'd booked, the agent had no way to act on it either.
+
+**Root cause:** Three layered issues. (1) Calendly may send `postMessage` data as a JSON string rather than an object, so `e.data.event` was `undefined` and the `'calendly.event_scheduled'` check silently failed every time. (2) There was no client tool for the agent to call when the user verbally reported completing their booking. (3) Earlier attempts used `sendContextualUpdate` to trigger agent speech on booking confirmation, but this method injects silent context — it doesn't reliably trigger the agent to speak; only `sendUserMessage` or resolving a pending tool Promise does.
+
+**Fix:** Updated `onCalendlyMsg` to parse `e.data` as JSON when it arrives as a string before checking the event type. Extracted a shared `confirmBooking()` function called by both the Calendly listener and a new `end_call` client tool. The `end_call` tool lets the agent end the session when the user verbally confirms they've booked. Added `suppressNextUserMsg` flag to hide the injected `sendUserMessage("Booking confirmed.")` from the transcript.
+
+**Lesson:** Always normalise Calendly `postMessage` data with `typeof e.data === 'string' ? JSON.parse(e.data) : e.data` before reading properties — the format varies. `sendContextualUpdate` is silent context only; use `sendUserMessage` to reliably trigger agent speech. For any post-booking action the user might trigger verbally, add a dedicated client tool rather than relying on the agent's system prompt alone.
+
+## 2026-04-09 — sendContextualUpdate on Calendly open triggered premature booking confirmation
+
+**Problem:** Adding a `sendContextualUpdate` call immediately after `openCalendly()` caused the agent to respond with the booking confirmation message before any booking had been made.
+
+**Root cause:** The `sendContextualUpdate` payload included language about the booking calendar and waiting for confirmation, which the agent misinterpreted as a booking completion event. Combined with a still-pending tool Promise, the agent's response was unpredictable.
+
+**Fix:** Removed `sendContextualUpdate` from the Calendly-open path entirely. The tool now resolves immediately with a return string instructing the agent to say "if you have any questions just ask" — this is the only reliable way to trigger speech while keeping the flow clean. The Calendly listener runs independently in the background.
+
+**Lesson:** Don't use `sendContextualUpdate` to trigger speech at the moment Calendly opens — the agent can misread the context. Resolve the tool immediately with explicit speech instructions instead, and handle the Calendly confirmation separately via a `window.message` listener.
+
 ## 2026-04-06 — ElevenLabs chatbot stuck on loading spinner; mic not released on close
 
 **Problem:** Clicking "Start Voice Chat" granted microphone permission but the loading spinner never cleared and the chat never connected. Closing the panel left the browser microphone indicator (red tab light) active.
