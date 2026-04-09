@@ -445,9 +445,7 @@ if (contactForm) {
       contactForm.reset();
       contactMsg.textContent = "Thanks! We'll be in touch shortly.";
       contactMsg.style.color = '';
-      if (typeof Calendly !== 'undefined') {
-        Calendly.showPopupWidget(CHATBOT_CONFIG.calendlyLink);
-      }
+      openCalendly({ name, email });
     } catch (err) {
       contactMsg.textContent = 'Something went wrong. Please email us directly at hello@kms-ai.co.uk';
       contactMsg.style.color = '#e88';
@@ -541,16 +539,27 @@ function initHeroCanvas() {
 initHeroCanvas();
 
 /* ──────────────────────────────────────────
-   CALENDLY POPUP — CTA BUTTONS
+   CALENDLY POPUP
    ────────────────────────────────────────── */
+function openCalendly(prefill = {}) {
+  if (typeof Calendly === 'undefined') return;
+  let url = CHATBOT_CONFIG.calendlyLink
+    + '?hide_gdpr_banner=1'
+    + '&background_color=060F0C'
+    + '&text_color=E8F5EE'
+    + '&primary_color=4AEAA5';
+  if (prefill.name)  url += '&name='  + encodeURIComponent(prefill.name);
+  if (prefill.email) url += '&email=' + encodeURIComponent(prefill.email);
+  Calendly.showPopupWidget(url);
+}
+
+// CTA buttons → open Calendly popup
 [document.querySelector('.nav__cta'), document.querySelector('.hero__actions .btn--primary')].forEach((el) => {
   if (!el) return;
   el.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopImmediatePropagation();
-    if (typeof Calendly !== 'undefined') {
-      Calendly.showPopupWidget(CHATBOT_CONFIG.calendlyLink);
-    }
+    openCalendly();
   });
 });
 
