@@ -219,6 +219,26 @@ chatbotChips.querySelectorAll('.chatbot-chip').forEach((chip) => {
   });
 });
 
+// ── Shared booking emails ────────────────────
+async function sendBookingEmails(params) {
+  if (typeof emailjs === 'undefined') return;
+  const data = {
+    customer_name:     params.name    || 'Not provided',
+    customer_email:    params.email   || 'Not provided',
+    customer_phone:    params.phone   || 'Not provided',
+    customer_company:  params.company || 'Not provided',
+    customer_interest: params.service || 'Discovery Call',
+    customer_message:  params.message || 'Not provided',
+    customer_time:     'Not specified',
+    customer_source:   params.source  || 'KMS website',
+    calendly_link:     CHATBOT_CONFIG.calendlyLink,
+  };
+  await Promise.allSettled([
+    emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateNotify,  data, { publicKey: CHATBOT_CONFIG.emailjsPublicKey }),
+    emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateConfirm, data, { publicKey: CHATBOT_CONFIG.emailjsPublicKey }),
+  ]);
+}
+
 // ── Session init ─────────────────────────────
 async function initSession() {
   sessionAborted = false;
@@ -237,6 +257,16 @@ async function initSession() {
     elConversation = await Promise.race([
       Conversation.startSession({
         agentId: CHATBOT_CONFIG.agentId,
+
+        clientTools: {
+          book_discovery_call: async (params = {}) => {
+            const { name = '', email = '', phone = '', company = '', service = '' } = params;
+            addMessage('system', 'Opening your booking calendar…');
+            sendBookingEmails({ name, email, phone, company, service, source: 'KMS AI voice chatbot' }).catch(() => {});
+            openCalendly({ name, email });
+            return 'Booking calendar opened. The user will now see the Calendly scheduling page.';
+          },
+        },
 
         onDisconnect: () => {
           if (sessionActive) endSession(true);
@@ -438,12 +468,15 @@ if (contactForm) {
     };
 
     try {
-      if (typeof emailjs !== 'undefined') {
-        await Promise.allSettled([
-          emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateNotify,  params, { publicKey: CHATBOT_CONFIG.emailjsPublicKey }),
-          emailjs.send(CHATBOT_CONFIG.emailjsServiceId, CHATBOT_CONFIG.emailjsTemplateConfirm, params, { publicKey: CHATBOT_CONFIG.emailjsPublicKey }),
-        ]);
-      }
+      await sendBookingEmails({
+        name:    params.customer_name,
+        email:   params.customer_email,
+        phone:   params.customer_phone,
+        company: params.customer_company,
+        service: params.customer_interest,
+        message: params.customer_message,
+        source:  'KMS website contact form',
+      });
       contactForm.reset();
       contactMsg.textContent = "Thanks! We'll be in touch shortly.";
       contactMsg.style.color = '';
