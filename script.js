@@ -261,9 +261,9 @@ async function initSession() {
 
         clientTools: {
           book_discovery_call: async (params = {}) => {
-            const { name = '', email = '', phone = '', company = '', service = '' } = params;
+            const { name = '', email = '', phone = '', company = '', service = '', message = '' } = params;
             addMessage('system', 'Opening your booking calendar…');
-            sendBookingEmails({ name, email, phone, company, service, source: 'KMS AI voice chatbot' }).catch(() => {});
+            sendBookingEmails({ name, email, phone, company, service, message, source: 'KMS AI voice chatbot' }).catch(() => {});
             openCalendly({ name, email });
 
             // Pause the session timer while the user is in Calendly
